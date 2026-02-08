@@ -1,0 +1,17 @@
+{
+  "name": "dsljs",
+  "version": "0.1.0",
+  "author": "Ícaro Glauco de Oliveira",
+  "description": "Macro system / DSL expander for JavaScript",
+  "bin": {
+    "dsljs": "./bin/dsljs"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/parser.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "url": "^0.11.4"
+  }
+}
