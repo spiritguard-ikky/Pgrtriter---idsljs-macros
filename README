@@ -1,0 +1,15 @@
+Apply the following vscode settings for valid dsljs experience:
+    Associate dsl.js files to javascript linting and intelisense;
+    Enable semantic highlighting
+    and
+    Disable js validations. Otherwise you will get lsp erros. Uneeded for this type of macro based programming
+     
+```json
+    "files.associations": {
+        "*.dsl.js": "javascript"
+    },
+    "[javascript]": {
+        "editor.semanticHighlighting.enabled": true
+    },
+    "javascript.validate.enable": false,
+```
