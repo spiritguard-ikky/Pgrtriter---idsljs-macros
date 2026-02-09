@@ -10,7 +10,7 @@ if(true){
     const mesh = new THREE.BoxGeometry[0]
 }
 
-console.log("[Macro Log]:", `Build completo com ${scene}`);
+console.log("[Macro Log]:", `Build completo com ${const scene = new THREE.Scene()}`);
 
 const teste = function(){
             const atributo_var = "teste_atributo"

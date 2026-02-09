@@ -39,7 +39,7 @@ if(true){
     THREE mesh.BoxGeometry[0]
 }
 
-LOG `Build completo com ${scene}`
+LOG `Build completo com ${$(THREE scene.Scene())}`
 
 struct teste [
     atributo: "teste_atributo"

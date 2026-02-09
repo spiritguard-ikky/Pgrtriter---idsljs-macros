@@ -1,3 +1,26 @@
 #!/usr/bin/env node
+import fs from "fs";
+import path from "path";
+import {
+  stripMacrosBlock,
+  parseMacrosFromBlock,
+  expandMacros
+} from "../src/parser.js";
 
-require("../src/parser.js");
+const [, , input, output] = process.argv;
+
+if (!input) {
+  console.error("Uso: dsljs <entrada.dsl.js> [saida.js]");
+  process.exit(1);
+}
+
+const source = fs.readFileSync(input, "utf8");
+const { macrosBlock, output: code } = stripMacrosBlock(source);
+const macros = parseMacrosFromBlock(macrosBlock);
+const expanded = expandMacros(code, macros);
+
+if (output) {
+  fs.writeFileSync(output, expanded, "utf8");
+} else {
+  console.log(expanded);
+}

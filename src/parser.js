@@ -393,6 +393,7 @@ function matchNodes(nodes, tokens, i0) {
   return { ok: true, next: i, scalars, repeats };
 }
 
+
 function expandBody(bodySrc, matchCtx) {
   let out = bodySrc;
 
@@ -586,6 +587,63 @@ function indentBlock(text, indent) {
     .join("\n");
 }
 
+function expandMacroExpressions(code, macros) {
+  let out = "";
+  let i = 0;
+
+  while (i < code.length) {
+    const idx = code.indexOf("$(", i);
+    if (idx === -1) {
+      out += code.slice(i);
+      break;
+    }
+
+    out += code.slice(i, idx);
+    i = idx + 2;
+
+    // capturar conteúdo balanceado de (...)
+    let depth = 1;
+    let expr = "";
+
+    while (i < code.length && depth > 0) {
+      const ch = code[i];
+
+      if (ch === "(") depth++;
+      else if (ch === ")") depth--;
+
+      if (depth > 0) expr += ch;
+      i++;
+    }
+
+    // tentar casar macro dentro da expressão
+    const tokens = tokenize(expr.trim());
+    let replaced = false;
+
+    for (const mac of macros) {
+      if (!tokens.length) continue;
+      if (tokens[0].k !== "id") continue;
+      if (tokens[0].t !== mac.head) continue;
+
+      const res = matchNodes(mac.pattern, tokens, 0);
+      if (!res.ok) continue;
+
+      let expanded = expandBody(mac.bodySrc, res);
+      expanded = expandMacros(expanded, macros);
+      out += expanded.trim();
+      replaced = true;
+      break;
+    }
+
+    if (!replaced) {
+      // se não for macro válida, preserva literal
+      out += `$(${expr})`;
+    }
+  }
+
+  return out;
+}
+
+
 function applyMacrosOnce(code, macros) {
   // Find candidates by head token at line start (preserve indent)
   // Collect replacements from end to start.
@@ -604,7 +662,10 @@ function applyMacrosOnce(code, macros) {
       const res = matchNodes(mac.pattern, sliceTokens, 0);
       if (!res.ok) continue;
 
-      const expanded = expandBody(mac.bodySrc, res).trimEnd();
+      let expanded = expandBody(mac.bodySrc, res).trimEnd();
+      expanded = expandMacroExpressions(expanded, macros);
+      expanded = expandMacros(expanded, macros);
+      
       const withIndent = indentBlock(expanded, indent) + (slice.endsWith("\n") ? "\n" : "");
 
       reps.push({ startIdx, endIdx, replacement: withIndent });
@@ -620,6 +681,7 @@ function applyMacrosOnce(code, macros) {
   }
   return out;
 }
+
 
 export function expandMacros(code, macros, maxPasses = 20) {
   let current = code;
