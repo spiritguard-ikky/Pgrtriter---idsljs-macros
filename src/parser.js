@@ -217,6 +217,18 @@ function parsePatternRaw(src) {
       continue;
     }
 
+    const blockMatch = src.slice(i).match(/^\[\s*\$([a-zA-Z_]\w*)\s*\]/);
+    if (blockMatch) {
+        nodes.push({
+          kind: "block",
+          name: blockMatch[1],
+          open: "[",
+          close: "]"
+        });
+        i += blockMatch[0].length;
+        continue;
+    }
+
     // 2️⃣ REPETIÇÃO: $( ... )...
     if (src.startsWith("$(", i)) {
       let j = i + 2;
@@ -321,15 +333,16 @@ function matchNodes(nodes, tokens, i0) {
       return true;
     }
     if (node.kind === "rest") {
-      const parts = [];
-      // consome tudo até newline
-      while (i < tokens.length && tokens[i].k !== "nl") {
-        parts.push(tokens[i].t);
-        i++;
-      }
-      scalars[node.name] = parts.join("");
+      const remaining = tokens
+        .slice(i)
+        .map(t => t.raw ?? t.t)
+        .join("");
+
+      scalars[node.name] = remaining;
+      i = tokens.length;
       return true;
     }
+
 
     if (node.kind === "ph") {
       if (i >= tokens.length) return false;
@@ -532,53 +545,65 @@ function escapeRegex(s) {
 }
 
 function findInvocationSlice(code, startIdx, patternSrc) {
-  // If pattern includes '{', capture a balanced {...} block from the first '{' after start
-  const bracePos = code.indexOf("{", startIdx);
-  const wantsBlock = patternSrc.includes("{") && patternSrc.includes("}");
-  if (!wantsBlock) {
-    // single line
+  const wantsBrace = patternSrc.includes("{") && patternSrc.includes("}");
+  const wantsBracket = patternSrc.includes("[") && patternSrc.includes("]");
+
+  const startPos =
+    wantsBrace ? code.indexOf("{", startIdx) :
+    wantsBracket ? code.indexOf("[", startIdx) :
+    -1;
+
+  if (startPos === -1) {
     const end = code.indexOf("\n", startIdx);
     return { endIdx: end === -1 ? code.length : end + 1 };
   }
 
-  if (bracePos === -1) {
-    const end = code.indexOf("\n", startIdx);
-    return { endIdx: end === -1 ? code.length : end + 1 };
-  }
+  const open = code[startPos];
+  const close = open === "{" ? "}" : "]";
 
-  // scan for matching '}'
-  let i = bracePos;
+  let i = startPos;
   let depth = 0;
+
   while (i < code.length) {
     const ch = code[i];
 
-    // skip strings so braces inside strings don't count
+    // ignorar strings
     if (ch === '"' || ch === "'" || ch === "`") {
       const q = ch;
       i++;
       while (i < code.length) {
         const c2 = code[i];
-        if (c2 === "\\" && i + 1 < code.length) { i += 2; continue; }
-        if (c2 === q) { i++; break; }
+        if (c2 === "\\" && i + 1 < code.length) {
+          i += 2;
+          continue;
+        }
+        if (c2 === q) {
+          i++;
+          break;
+        }
         i++;
       }
       continue;
     }
 
-    if (ch === "{") depth++;
-    if (ch === "}") {
+    if (ch === open) depth++;
+    if (ch === close) {
       depth--;
       if (depth === 0) {
-        // include trailing newline if present
-        const end = (i + 1 < code.length && code[i + 1] === "\n") ? i + 2 : i + 1;
+        const end =
+          (i + 1 < code.length && code[i + 1] === "\n")
+            ? i + 2
+            : i + 1;
         return { endIdx: end };
       }
     }
+
     i++;
   }
 
   return { endIdx: code.length };
 }
+
 
 function indentBlock(text, indent) {
   return text
