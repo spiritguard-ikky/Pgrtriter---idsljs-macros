@@ -14,19 +14,22 @@ macros: {
     )#
 
     $macro struct $name [
-        $($attr : $val1)... 
+        $($attr : $val1),
+        $declarações
     ] => {
         $($prop = $value)...
     }
     #(
         const $name = function(){
-            const $`${$attr}_var` = $val1
+            const $`${$attr}_var` = $val1;
+            const teste_1 = $declarações[0];
             return {
                 $attr: () => $`${$attr}_var`,
                 $($prop: $value,)...
             }
         }
     )#
+
 }
 
 
@@ -41,8 +44,11 @@ if(true){
 
 LOG `Build completo com ${$(THREE scene.Scene())}`
 
+const lista_qualquer = [1,2,3,4]
+
 struct teste [
-    atributo: "teste_atributo"
+    atributo: "teste_atributo",
+    lista_qualquer
 ] => {
     propriedade = "valor teste"
 }

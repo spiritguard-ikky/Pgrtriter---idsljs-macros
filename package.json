@@ -10,6 +10,9 @@
   "exports": {
     ".": "./src/parser.js"
   },
+  "scripts": {
+    "_example": "node src/parser.js example/example.dsljs.js"
+  },
   "license": "MIT",
   "dependencies": {
     "url": "^0.11.4"
