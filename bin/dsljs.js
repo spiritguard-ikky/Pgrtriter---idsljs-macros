@@ -13,6 +13,48 @@ import vm from "node:vm";
 import { createRequire } from "node:module";
 import process from "node:process";
 
+import { spawn } from "node:child_process";
+import os from "node:os";
+
+let child = null;
+
+function runSpawn(inputFile, argv = []) {
+  // gera JS temporário
+  const source = fs.readFileSync(inputFile, "utf8");
+  const { macrosBlock, output: code } = stripMacrosBlock(source);
+  const macros = parseMacrosFromBlock(macrosBlock);
+  const expanded = expandMacros(code, macros);
+
+  const tmpFile = path.join(
+    path.dirname(inputFile),
+    `.${path.basename(inputFile)}.dsljs.tmp.mjs`
+  );
+  fs.writeFileSync(tmpFile, expanded, "utf8");
+
+  // mata execução anterior
+  if (child) {
+    child.kill("SIGTERM");
+    child = null;
+  }
+
+  console.log("▶ executing (spawn, ESM)...");
+
+  child = spawn(
+    process.execPath,           // node
+    [tmpFile, ...argv],
+    {
+      stdio: "inherit",
+      env: process.env
+    }
+  );
+
+  child.on("exit", code => {
+    if (code !== null) {
+      console.log("✔ exited:", code);
+    }
+  });
+}
+
 
 /* ─────────────────────────────
    Utils
@@ -212,6 +254,27 @@ function watchRunFile(inputFile, argv = []) {
 }
 
 
+function watchRunSpawn(inputFile, argv = []) {
+  console.log("🚀 watch-run (spawn) iniciado:", inputFile);
+
+  const run = () => {
+    try {
+      runSpawn(inputFile, argv);
+    } catch (err) {
+      console.error("✖ runtime error\n", err);
+    }
+  };
+
+  run();
+
+  chokidar.watch(inputFile, { ignoreInitial: true })
+    .on("change", () => {
+      console.log("♻ restarting...");
+      run();
+    });
+}
+
+
 /* ─────────────────────────────
    CLI
 ───────────────────────────── */
@@ -264,7 +327,7 @@ function main() {
     }
 
     const extraArgs = process.argv.slice(4);
-    watchRunFile(a, extraArgs);
+    watchRunSpawn(a, extraArgs);
     return;
   }
 

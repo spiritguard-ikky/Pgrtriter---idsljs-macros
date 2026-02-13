@@ -2,20 +2,21 @@
 
 
 
-const scene = new THREE.Scene()
+THREE scene.Scene()
 
-const camera = new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,0.1,1000)
+THREE camera.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
 
 if(true){
-    const mesh = new THREE.BoxGeometry[0]
+    THREE mesh.BoxGeometry[0]
 }
 
-console.log("[Macro Log]:", `Build completo com ${const scene = new THREE.Scene()}`);
+console.log("[Macro Log]:", `Build completo com ${$(THREE scene.Scene())}`);
 
-const teste = function(){
-            const atributo_var = "teste_atributo"
-            return {
-                atributo: () => atributo_var,
-                propriedade: "valor teste",
-            }
-        }
+const lista_qualquer = [1,2,3,4]
+
+struct teste [
+    atributo: "teste_atributo",
+    lista_qualquer
+] => {
+    propriedade = "valor teste"
+}

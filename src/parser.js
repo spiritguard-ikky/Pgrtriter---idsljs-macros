@@ -42,6 +42,7 @@ function readString(src, i) {
 function readBalanced(src, i, open, close) {
   let j = i;
   let depth = 0;
+
   while (j < src.length) {
     const ch = src[j];
 
@@ -54,18 +55,26 @@ function readBalanced(src, i, open, close) {
     if (ch === open) depth++;
     if (ch === close) {
       depth--;
-      if (depth === 0) { j++; break; }
+      if (depth === 0) {
+        j++;
+        break;
+      }
     }
+
     j++;
   }
-  if (depth !== 0){
-    console.log("❌ FAIL at node:", node);
-      console.log("Cursor at:", i);
-      console.log("Remaining:", src.slice(i, i + 60));
-      return { ok: false }
-    };
-  return { ok: true, text: src.slice(i, j), next: j };
+
+  if (depth !== 0) {
+    return { ok: false };
+  }
+
+  return {
+    ok: true,
+    text: src.slice(i, j),
+    next: j
+  };
 }
+
 
 // átomo do DSL: string, bloco balanceado, ou token até separador
 function readAtom(src, i) {
@@ -130,6 +139,12 @@ function matchLiteralToken(src, i, lit) {
   return { ok: true, next: i + lit.length };
 }
 
+function escapeForOuterTemplate(str) {
+  return str
+    .replace(/\\/g, "\\\\")   // escape barras primeiro
+    .replace(/`/g, "\\`");    // escape backticks
+}
+
 function matchNodesOnSource(nodes, src, i0, ctx) {
 
   console.log("\n--- MATCH START ---");
@@ -159,17 +174,56 @@ function matchNodesOnSource(nodes, src, i0, ctx) {
     }
 
     if (node.kind === "ph") {
+
+      i = skipWS(src, i);
+
+      // 🔹 capturar comentário + template literal juntos
+      if (src.startsWith("/*", i)) {
+
+        const cmtEnd = src.indexOf("*/", i + 2);
+        if (cmtEnd !== -1) {
+
+          let j = cmtEnd + 2;
+          j = skipWS(src, j);
+
+          if (src[j] === "`") {
+            const tpl = readString(src, j);
+            if (!tpl.ok) return { ok: false };
+
+            const full = src.slice(i, tpl.next);
+            ctx.scalars[node.name] = full.trim();
+            i = tpl.next;
+            continue;
+          }
+        }
+      }
+
+      // 🔹 delimitadores balanceados
+      const ch = src[i];
+
+      if (ch === "(" || ch === "{" || ch === "[") {
+
+        const pairs = { "(": ")", "{": "}", "[": "]" };
+
+        const b = readBalanced(src, i, ch, pairs[ch]);
+        if (!b.ok) return { ok: false };
+
+        ctx.scalars[node.name] = b.text.slice(1, -1).trim();
+        i = b.next;
+        continue;
+      }
+
+      // 🔹 fallback normal
       const a = readAtom(src, i);
-      if (!a.ok){
-        console.log("❌ FAIL at node:", node);
-      console.log("Cursor at:", i);
-      console.log("Remaining:", src.slice(i, i + 60));
-      return { ok: false }
-    };
+      if (!a.ok) return { ok: false };
+
       ctx.scalars[node.name] = a.text;
       i = a.next;
       continue;
     }
+
+
+
 
     if (node.kind === "block") {
       i = skipWS(src, i);
@@ -335,6 +389,91 @@ function matchNodesOnSource(nodes, src, i0, ctx) {
 //   return params;
 // }
 
+// function readString(src, i0) {
+//   const quote = src[i0];
+//   let i = i0 + 1;
+
+//   while (i < src.length) {
+//     const ch = src[i];
+
+//     if (ch === "\\" && i + 1 < src.length) {
+//       i += 2;
+//       continue;
+//     }
+
+//     if (ch === quote) {
+//       i++;
+//       break;
+//     }
+
+//     i++;
+//   }
+
+//   return {
+//     ok: true,
+//     raw: src.slice(i0, i),
+//     next: i
+//   };
+// }
+
+function readTemplateLiteral(src, i) {
+  if (src[i] !== "`") return { ok: false };
+
+  let j = i + 1;
+  let depthExpr = 0;
+
+  while (j < src.length) {
+    const ch = src[j];
+
+    // escape
+    if (ch === "\\" && j + 1 < src.length) {
+      j += 2;
+      continue;
+    }
+
+    // ${ interpolation
+    if (ch === "$" && src[j + 1] === "{") {
+      depthExpr++;
+      j += 2;
+      continue;
+    }
+
+    if (ch === "}" && depthExpr > 0) {
+      depthExpr--;
+      j++;
+      continue;
+    }
+
+    // nested template literal
+    if (ch === "`" && depthExpr === 0) {
+      // ⚠️ verificar se é abertura de nested template
+      // olhando para trás para ver se faz parte de /* css */`
+      const prevSlice = src.slice(Math.max(0, j - 10), j);
+
+      if (prevSlice.includes("/*")) {
+        const nested = readTemplateLiteral(src, j);
+        if (!nested.ok) return { ok: false };
+        j = nested.next;
+        continue;
+      }
+
+      // fechamento real
+      return {
+        ok: true,
+        text: src.slice(i, j + 1),
+        inner: src.slice(i + 1, j),
+        next: j + 1
+      };
+    }
+
+    j++;
+  }
+
+  return { ok: false };
+}
+
+
+
 
 // ====== Tokenizer (com strings e preservando \n) ======
 function tokenize(src) {
@@ -361,21 +500,26 @@ function tokenize(src) {
       continue;
     }
 
-    if (c === '"' || c === "'" || c === "`") {
-      const quote = c;
-      let j = i + 1;
-
-      while (j < src.length) {
-        const ch = src[j];
-        if (ch === "\\" && j + 1 < src.length) { j += 2; continue; }
-        if (ch === quote) { j++; break; }
-        j++;
-      }
-
-      out.push({ t: src.slice(start, j), k: "str", start, end: j });
-      i = j;
+    if (c === "`") {
+      const tpl = readTemplateLiteral(src, i);
+      out.push({
+        t: tpl.raw,
+        k: "template",
+        start,
+        end: tpl.next
+      });
+      i = tpl.next;
       continue;
     }
+
+    if (c === '"' || c === "'") {
+      const s = readString(src, i);
+      out.push({ t: s.raw, k: "str", start, end: s.next });
+      i = s.next;
+      continue;
+    }
+
+
 
     if (c === "$" && isIdentStart(src[i + 1] || "")) {
       let j = i + 1;
@@ -746,6 +890,59 @@ function matchNodes(nodes, tokens, i0) {
   return { ok: true, next: i, scalars, repeats };
 }
 
+function escapeUnescapedBackticks(text) {
+  // escapa apenas ` que NÃO esteja precedido por \
+  // (evita virar \\` e evita triplo-escape)
+  return text.replace(/(?<!\\)`/g, "\\`");
+}
+
+
+function escapeTemplatesInsideAnnotatedJavascript(src) {
+  let out = "";
+  let i = 0;
+
+  while (i < src.length) {
+
+    if (src.startsWith("/*", i)) {
+
+      const endCmt = src.indexOf("*/", i + 2);
+      if (endCmt === -1) {
+        out += src[i++];
+        continue;
+      }
+
+      const comment = src.slice(i, endCmt + 2);
+      const isJS = /\/\*\s*javascript\s*\*\//i.test(comment);
+
+      out += comment;
+      i = endCmt + 2;
+
+      if (!isJS) continue;
+
+      i = skipWS(src, i);
+
+      if (src[i] !== "`") continue;
+
+      const tpl = readTemplateLiteral(src, i);
+      if (!tpl.ok) continue;
+
+      const escapedContent = tpl.inner.replace(/(?<!\\)`/g, "\\`");
+
+      out += "`" + escapedContent + "`";
+
+      i = tpl.next;
+      continue;
+    }
+
+    out += src[i++];
+  }
+
+  return out;
+}
+
+
+
+
 
 function expandBody(bodySrc, matchCtx) {
   let out = bodySrc;
@@ -756,11 +953,12 @@ function expandBody(bodySrc, matchCtx) {
   // 2️⃣ expandir identificadores templated $`{...}`
   out = expandTemplateIdentifiers(out, matchCtx);
 
-  // 3️⃣ expandir substituições simples $var
+  // detecta se o corpo está dentro de template literal
   out = out.replace(PH_RE, (_, name) => {
     if (name in matchCtx.scalars) return matchCtx.scalars[name];
     return `$${name}`;
   });
+
 
   return out;
 }
@@ -1000,6 +1198,7 @@ function applyMacrosOnce(code, macros) {
       let expanded = expandBody(mac.bodySrc, ctx).trimEnd();
       expanded = expandMacroExpressions(expanded, macros);
 
+
       const withIndent =
         indentBlock(expanded, indent) +
         (hasTrailingNewline ? "\n" : "");
@@ -1014,15 +1213,19 @@ function applyMacrosOnce(code, macros) {
 
 
 
-export function expandMacros(code, macros, maxPasses = 20) {
+export function expandMacros(code, macros) {
   let current = code;
-  for (let p = 0; p < maxPasses; p++) {
+
+  while (true) {
     const next = applyMacrosOnce(current, macros);
-    if (next === current) return next;
+    if (next === current) {
+      // 🔥 AQUI
+      return escapeTemplatesInsideAnnotatedJavascript(next);
+    }
     current = next;
   }
-  throw new Error("Macro expansion exceeded max passes (possible infinite recursion)");
 }
+
 
 export function stripMacrosBlock(source) {
   const idx = source.indexOf("macros:");
