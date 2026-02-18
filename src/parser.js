@@ -1002,7 +1002,11 @@ export function parseMacrosFromBlock(block) {
   if (!block) return [];
 
   const macroRe =
+<<<<<<< HEAD
     /^\s*\$macro\s+([\s\S]*?)\s*#\(\s*([\s\S]*?)\s*\)\;/gm;
+=======
+    /^\s*\$macro\s+([\s\S]*?)\s*#\(\s*([\s\S]*?)\s*\);/gm;
+>>>>>>> 5e29531d3fd3938ce83e0c20f746f99d56a37f29
 
   const macros = [];
   let mm;
