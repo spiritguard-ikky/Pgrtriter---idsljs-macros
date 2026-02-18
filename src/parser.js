@@ -11,7 +11,7 @@ function isMain() {
 }
 // console.log(output)
 
-const DEBUG_REP = true;
+const DEBUG_REP = false;
 
 const isWSChar = (c) => c === " " || c === "\t" || c === "\r" || c === "\n";
 const isIdentChar = (c) => /[A-Za-z0-9_$]/.test(c || "");
@@ -80,7 +80,8 @@ function readBalanced(src, i, open, close) {
 function readAtom(src, i) {
   i = skipWS(src, i);
   if (i >= src.length){
-    console.log("❌ FAIL at node:", node);
+
+      console.log("❌ FAIL at node:", node);
       console.log("Cursor at:", i);
       console.log("Remaining:", src.slice(i, i + 60));
       return { ok: false }
@@ -147,9 +148,11 @@ function escapeForOuterTemplate(str) {
 
 function matchNodesOnSource(nodes, src, i0, ctx) {
 
-  console.log("\n--- MATCH START ---");
-  console.log("Nodes:", nodes.map(n => n.kind + (n.t ? ":" + n.t : "")));
-  console.log("Source:", src.slice(i0, i0 + 120));
+  if(DEBUG_REP){
+    console.log("\n--- MATCH START ---");
+    console.log("Nodes:", nodes.map(n => n.kind + (n.t ? ":" + n.t : "")));
+    console.log("Source:", src.slice(i0, i0 + 120));
+  }
 
   let i = i0;
   
@@ -999,7 +1002,7 @@ export function parseMacrosFromBlock(block) {
   if (!block) return [];
 
   const macroRe =
-    /^\s*\$macro\s+([\s\S]*?)\s*#\(\s*([\s\S]*?)\s*\)#/gm;
+    /^\s*\$macro\s+([\s\S]*?)\s*#\(\s*([\s\S]*?)\s*\);/gm;
 
   const macros = [];
   let mm;
@@ -1160,11 +1163,13 @@ function applyMacrosOnce(code, macros) {
       const indent = m[1];
       const startIdx = m.index;
 
-      console.log("\n=== TRY MACRO ===");
-      console.log("Macro:", mac.head);
-      console.log("StartIdx:", startIdx);
-      console.log("Snippet:\n", code.slice(startIdx, startIdx + 120));
-      console.log("=================\n");
+      if(DEBUG_REP){
+        console.log("\n=== TRY MACRO ===");
+        console.log("Macro:", mac.head);
+        console.log("StartIdx:", startIdx);
+        console.log("Snippet:\n", code.slice(startIdx, startIdx + 120));
+        console.log("=================\n");
+      }
       const ctx = { scalars: {}, repeats: [] };
 
       // pular o head já garantido
@@ -1172,7 +1177,9 @@ function applyMacrosOnce(code, macros) {
 
       // remover o primeiro node (literal head) do pattern
       const patternWithoutHead = mac.pattern.slice(1);
-      console.log("Pattern FULL:", mac.pattern);
+      if(DEBUG_REP){
+        console.log("Pattern FULL:", mac.pattern);
+      }
 
       const res = matchNodesOnSource(
         patternWithoutHead,
