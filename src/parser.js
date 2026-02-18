@@ -11,7 +11,11 @@ function isMain() {
 }
 // console.log(output)
 
-const DEBUG_REP = false;
+const DEBUG_REP =
+  process.env.DEBUG_REP === "1" ||
+  process.env.DEBUG_REP === "true" ||
+  false;
+
 
 const isWSChar = (c) => c === " " || c === "\t" || c === "\r" || c === "\n";
 const isIdentChar = (c) => /[A-Za-z0-9_$]/.test(c || "");
@@ -738,6 +742,23 @@ function expandTemplateIdentifiers(src, matchCtx) {
       });
     });
 
+    expanded = expanded.replace(/\$([A-Za-z_\p{L}][A-Za-z0-9_\p{L}]*)/gu, (_, ident) => {
+      // match exato primeiro
+      if (ident in matchCtx.scalars) return matchCtx.scalars[ident];
+
+      // tenta maior prefixo existente no ctx
+      for (let cut = ident.length - 1; cut >= 1; cut--) {
+        const head = ident.slice(0, cut);
+        if (head in matchCtx.scalars) {
+          const tail = ident.slice(cut);
+          return String(matchCtx.scalars[head]) + tail;
+        }
+      }
+
+      // não achou nada
+      return `$${ident}`;
+    });
+
     // identificador não pode ter espaços
     return expanded.replace(/\s+/g, "");
   });
@@ -1002,7 +1023,7 @@ export function parseMacrosFromBlock(block) {
   if (!block) return [];
 
   const macroRe =
-    /^\s*\$macro\s+([\s\S]*?)\s*#\(\s*([\s\S]*?)\s*\)\;/gm;
+    /^\s*\$macro\s+([\s\S]*?)\s*#\(\s*([\s\S]*?)\s*\)#/gm;
 
   const macros = [];
   let mm;
@@ -1138,6 +1159,7 @@ function expandMacroExpressions(code, macros) {
 
       let expanded = expandBody(mac.bodySrc, res);
       expanded = expandMacros(expanded, macros);
+      expanded = expandTemplateIdentifiers(expanded, res);
       out += expanded.trim();
       replaced = true;
       break;
@@ -1226,12 +1248,12 @@ export function expandMacros(code, macros) {
   while (true) {
     const next = applyMacrosOnce(current, macros);
     if (next === current) {
-      // 🔥 AQUI
       return escapeTemplatesInsideAnnotatedJavascript(next);
     }
     current = next;
   }
 }
+
 
 
 export function stripMacrosBlock(source) {
