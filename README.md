@@ -240,6 +240,49 @@ export default defineConfig({
 });
 ```
 
+Arquivos .dsljs serão processados antes do bundler.
+
+---
+
+# Estrutura do Pacote
+
+```
+dsljs/
+├── bin/
+├── example/
+├── src/
+│   ├── parser.js
+│   └── vite-plugin.js
+├── package.json
+└── README.md
+```
+
+---
+
+# Configuração Obrigatória no VSCode
+
+Criar pasta:
+
+.projeto/
+└── .vscode/
+    └── settings.json
+
+Conteúdo:
+
+```json
+{
+    "files.associations": {
+        "*.dsl.js": "javascript"
+    },
+    "[javascript]": {
+        "editor.semanticHighlighting.enabled": true
+    },
+    "javascript.validate.enable": false
+}
+```
+
+Necessário para evitar erros de LSP antes da expansão das macros.
+
 ---
 
 # Observações
