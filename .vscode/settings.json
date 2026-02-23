@@ -1,0 +1,9 @@
+{
+    "files.associations": {
+        "*.dsl.js": "javascript"
+    },
+    "[javascript]": {
+        "editor.semanticHighlighting.enabled": true
+    },
+    "javascript.validate.enable": false
+}
