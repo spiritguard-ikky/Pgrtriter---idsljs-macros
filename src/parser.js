@@ -732,38 +732,111 @@ function collectVars(nodes) {
 
 const TEMPLATE_IDENT_RE = /\$\`([\s\S]*?)\`/g;
 
-function expandTemplateIdentifiers(src, matchCtx) {
-  return src.replace(TEMPLATE_IDENT_RE, (_, inner) => {
-    // resolve ${...} dentro do template
-    let expanded = inner.replace(/\$\{([\s\S]*?)\}/g, (_, expr) => {
-      return expr.replace(PH_RE, (_, v) => {
-        if (v in matchCtx.scalars) return matchCtx.scalars[v];
-        return `$${v}`;
-      });
-    });
+function applyCompileTimeMutations(src) {
+  console.log("COMPILE_TIME_VARS before:", COMPILE_TIME_VARS);
 
-    expanded = expanded.replace(/\$([A-Za-z_\p{L}][A-Za-z0-9_\p{L}]*)/gu, (_, ident) => {
-      // match exato primeiro
-      if (ident in matchCtx.scalars) return matchCtx.scalars[ident];
+  src = src.replace(/^\s*([A-Za-z_\p{L}][A-Za-z0-9_\p{L}]*)\s*\+=\s*(\d+)\s*;?/gmu,
+    (_, name, value) => {
+      const n = Number(value);
+      if (!Object.prototype.hasOwnProperty.call(COMPILE_TIME_VARS, name)) {
+        COMPILE_TIME_VARS[name] = 0;
+      }
+      COMPILE_TIME_VARS[name] += n;
+      return ""; // remove linha
+    }
+  );
 
-      // tenta maior prefixo existente no ctx
-      for (let cut = ident.length - 1; cut >= 1; cut--) {
-        const head = ident.slice(0, cut);
-        if (head in matchCtx.scalars) {
-          const tail = ident.slice(cut);
-          return String(matchCtx.scalars[head]) + tail;
+  console.log("COMPILE_TIME_VARS after:", COMPILE_TIME_VARS);
+  return src;
+}
+function expandTemplateIdentifiers(src, matchCtx, DEBUG_TPL = true) {
+  const log = (...a) => DEBUG_TPL && console.log("[TPL]", ...a);
+
+  log("ENTER expandTemplateIdentifiers");
+  log("scalars keys:", Object.keys(matchCtx?.scalars || {}));
+
+  const out = src.replace(/\$\`([\s\S]*?)\`/g, (full, inner, off) => {
+    log("MATCH $`...` at", off);
+    log("RAW inner:\n" + inner);
+
+    let result = "";
+    let i = 0;
+
+    while (i < inner.length) {
+      // ${...}
+      if (inner[i] === "$" && inner[i + 1] === "{") {
+        let j = i + 2;
+        let depth = 1;
+
+        while (j < inner.length && depth > 0) {
+          if (inner[j] === "{") depth++;
+          else if (inner[j] === "}") depth--;
+          j++;
+        }
+
+        const exprRaw = inner.slice(i + 2, j - 1);
+        const expr = exprRaw.trim();
+
+        log("FOUND ${...} expr:", JSON.stringify(expr));
+
+        const scalars = matchCtx?.scalars || {};
+
+        if (Object.prototype.hasOwnProperty.call(scalars, expr)) {
+          const val = scalars[expr];
+          log("RESOLVE ${" + expr + "} via scalars =>", JSON.stringify(val));
+          result += String(val);
+        }
+        else if (Object.prototype.hasOwnProperty.call(COMPILE_TIME_VARS, expr)) {
+          const val = COMPILE_TIME_VARS[expr];
+          log("RESOLVE ${" + expr + "} via COMPILE_TIME_VARS =>", JSON.stringify(val));
+          result += String(val);
+        }
+        else {
+          log("MISS ${" + expr + "} -> literal fallback");
+          result += expr;
+        }
+
+        i = j;
+        continue;
+      }
+
+      // $var
+      if (inner[i] === "$") {
+        const m = inner.slice(i).match(/^\$([A-Za-z_\p{L}][A-Za-z0-9_\p{L}]*)/u);
+        if (m) {
+          const name = m[1];
+          const scalars = matchCtx?.scalars || {};
+          log("FOUND $var:", name);
+
+          if (Object.prototype.hasOwnProperty.call(scalars, name)) {
+            const val = scalars[name];
+            log("RESOLVE $" + name + " =>", JSON.stringify(val));
+            result += String(val);
+          } else {
+            log("MISS $" + name + " (not in scalars) -> keep as-is");
+            result += "$" + name;
+          }
+
+          i += m[0].length;
+          continue;
         }
       }
 
-      // não achou nada
-      return `$${ident}`;
-    });
+      result += inner[i];
+      i++;
+    }
 
-    // identificador não pode ter espaços
-    return expanded.replace(/\s+/g, "");
+    const collapsed = result.replace(/\s+/g, "");
+    log("RESULT before collapse:", JSON.stringify(result));
+    log("RESULT collapsed:", JSON.stringify(collapsed));
+    log("REPLACE full:", JSON.stringify(full), "=>", JSON.stringify(collapsed));
+
+    return collapsed;
   });
-}
 
+  log("EXIT expandTemplateIdentifiers");
+  return out;
+}
 // ====== Matcher (unification) ======
 function matchNodes(nodes, tokens, i0) {
   let i = i0;
@@ -920,6 +993,35 @@ function escapeUnescapedBackticks(text) {
   return text.replace(/(?<!\\)`/g, "\\`");
 }
 
+function extractGlobalDSL(src, globalDSL) {
+  const blockMatch = src.match(/macros:\s*\{([\s\S]*?)\}/);
+
+  if (!blockMatch) return src;
+
+  const body = blockMatch[1];
+
+  body.replace(
+    /\$declare\s+([A-Za-z_\p{L}][A-Za-z0-9_\p{L}]*)\s+(.+)/gu,
+    (_, name, valueExpr) => {
+
+      const value = valueExpr.trim();
+
+      console.log("[GLOBAL DECLARE]", name, "=", value);
+
+      if (/^\d+$/.test(value)) {
+        globalDSL.scalars[name] = Number(value);
+      }
+      else {
+        globalDSL.scalars[name] = value;
+      }
+
+      return "";
+    }
+  );
+
+  // remover bloco do código
+  return src.replace(blockMatch[0], "");
+}
 
 function escapeTemplatesInsideAnnotatedJavascript(src) {
   let out = "";
@@ -966,27 +1068,27 @@ function escapeTemplatesInsideAnnotatedJavascript(src) {
 
 
 
-
-
 function expandBody(bodySrc, matchCtx) {
+  console.log("BODY SRC:\n", bodySrc);
   let out = bodySrc;
 
-  // 1️⃣ expandir repetições
-  out = expandBodyReps(out, matchCtx);
+  console.log("COMPILE_TIME_VARS before:", COMPILE_TIME_VARS);
+  // 1️⃣ primeiro executar mutações compile-time
+  out = applyCompileTimeMutations(out);
+  console.log("COMPILE_TIME_VARS after:", COMPILE_TIME_VARS);
 
-  // 2️⃣ expandir identificadores templated $`{...}`
+  // 2️⃣ depois expandir templates
+  out = expandBodyReps(out, matchCtx);
   out = expandTemplateIdentifiers(out, matchCtx);
 
-  // detecta se o corpo está dentro de template literal
+  // 3️⃣ placeholders simples
   out = out.replace(PH_RE, (_, name) => {
     if (name in matchCtx.scalars) return matchCtx.scalars[name];
     return `$${name}`;
   });
 
-
   return out;
 }
-
 
 function expandBodyReps(bodySrc, matchCtx) {
   return bodySrc.replace(
@@ -1224,8 +1326,13 @@ function applyMacrosOnce(code, macros) {
       const hasTrailingNewline =
         endIdx < code.length && code[endIdx] === "\n";
 
-      let expanded = expandBody(mac.bodySrc, ctx).trimEnd();
+      let expanded = expandBody(mac.bodySrc, ctx);
+
+      // 🔥 AQUI É O LUGAR CERTO
+      expanded = applyCompileTimeMutations(expanded);
+
       expanded = expandMacroExpressions(expanded, macros);
+      expanded = expanded.trimEnd();
 
 
       const withIndent =
@@ -1257,13 +1364,12 @@ export function expandMacros(code, macros) {
 
 
 export function stripMacrosBlock(source) {
-  const idx = source.indexOf("macros:");
-  if (idx === -1) return { macrosBlock: "", output: source };
 
+  const match = source.match(/macros\s*:\s*\{/);
+  if (!match) return { macrosBlock: "", output: source };
+
+  const idx = match.index;
   const braceStart = source.indexOf("{", idx);
-  if (braceStart === -1) {
-    throw new Error("macros: found but no opening {");
-  }
 
   let i = braceStart;
   let depth = 0;
@@ -1271,7 +1377,6 @@ export function stripMacrosBlock(source) {
   while (i < source.length) {
     const ch = source[i];
 
-    // ignorar strings
     if (ch === '"' || ch === "'" || ch === "`") {
       const q = ch;
       i++;
@@ -1304,7 +1409,23 @@ export function stripMacrosBlock(source) {
     i++;
   }
 
-  throw new Error("Unclosed macros:{ block");
+  throw new Error("Unclosed macros block");
+}
+
+let COMPILE_TIME_VARS = {};
+
+function extractCompileTimeDeclares(block) {
+  const compileTimeVars = {};
+
+  const cleaned = block.replace(
+    /^\s*\$declare\s+([A-Za-z_\p{L}][A-Za-z0-9_\p{L}]*)\s+(.+)$/gmu,
+    (_, name, value) => {
+      compileTimeVars[name] = eval(value);
+      return "";
+    }
+  );
+
+  return { cleanedMacrosBlock: cleaned, compileTimeVars };
 }
 
 if (isMain()) {
@@ -1319,8 +1440,15 @@ if (isMain()) {
   const source = fs.readFileSync(input, "utf8");
 
   const { macrosBlock, output } = stripMacrosBlock(source);
-  // ====== Example usage (wire into your existing CLI) ======
-  const finalOutput = expandMacros(output, parseMacrosFromBlock(macrosBlock));
+
+  const { cleanedMacrosBlock, compileTimeVars } =
+    extractCompileTimeDeclares(macrosBlock);
+
+  COMPILE_TIME_VARS = compileTimeVars;
+  console.log("COMPILE_TIME_VARS:", COMPILE_TIME_VARS);
+
+  const macros = parseMacrosFromBlock(cleanedMacrosBlock);
+  const finalOutput = expandMacros(output, macros);
 
   if (outputFile) {
     const dir = path.dirname(outputFile);

@@ -8,7 +8,8 @@
   },
   "type": "module",
   "exports": {
-    ".": "./src/parser.js"
+    ".": "./src/parser.js",
+    "./vite": "./src/vite-plugin.js"
   },
   "scripts": {
     "_example": "node src/parser.js example/example.dsljs.js"
