@@ -1,4 +1,4 @@
-#Pgrtriter
+# Pgrtriter
 pgr + tr + iter
 
 Programação estrutural iterativa.
