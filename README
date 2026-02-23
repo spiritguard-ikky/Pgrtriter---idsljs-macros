@@ -1,15 +1,79 @@
+# DSLJS
+
+DSLJS é uma DSL baseada em JavaScript com expansão de macros em tempo de compilação.  
+O objetivo é permitir escrita declarativa e transformação determinística para JavaScript puro, sem runtime adicional.
+
+---
+
+# Instalação
+```
+npm install dsljs
+```
+---
+
+# Uso com Vite
+
+DSLJS fornece um plugin oficial para Vite.
+
+## vite.config.js
+```
+import { defineConfig } from "vite";
+import dsljs from "dsljs/vite";
+
+export default defineConfig({
+  plugins: [dsljs()]
+});
+```
+Arquivos com extensão .dsljs serão:
+
+1. Carregados pelo plugin  
+2. Terão o bloco de macros extraído  
+3. Terão as macros parseadas  
+4. Serão expandidos  
+5. Retornarão JavaScript válido para o bundler  
+
+---
+
+# Estrutura do Pacote
+```
+dsljs/
+├── bin/
+├── example/
+├── src/
+│   ├── parser.js
+│   └── vite-plugin.js
+├── package.json
+└── README.md
+```
+---
+
+# Configuração Obrigatória no VSCode
+
+Para evitar erros de LSP e conflitos com validações do TypeScript, aplique as seguintes configurações no VSCode.
+
 Apply the following vscode settings for valid dsljs experience:
-    Associate dsl.js files to javascript linting and intelisense;
-    Enable semantic highlighting
-    and
-    Disable js validations. Otherwise you will get lsp erros. Uneeded for this type of macro based programming
-     
-```json
+
+- Associate dsl.js files to javascript linting and intellisense  
+- Enable semantic highlighting  
+- Disable js validations (caso contrário ocorrerão erros de LSP desnecessários para programação baseada em macros)
+
+Adicionar no settings.json:
+```
+{
     "files.associations": {
         "*.dsl.js": "javascript"
     },
     "[javascript]": {
         "editor.semanticHighlighting.enabled": true
     },
-    "javascript.validate.enable": false,
+    "javascript.validate.enable": false
+}
 ```
+---
+
+# Observações Importantes
+
+- DSLJS opera em tempo de compilação.
+- O código gerado é JavaScript puro.
+- Não existe runtime específico da DSL.
+- Validações do TypeScript devem ser desativadas para evitar falsos erros causados por macros antes da expansão.
