@@ -1,11 +1,12 @@
+
 # Pgrtriter
 pgr + tr + iter
 
 Programação estrutural iterativa.
 
-É uma linguagem de transformação estrutural construída sobre JavaScript e é referenciada nesse pacote pelo nome de pacote DSLJS.
+Pgrtriter é uma linguagem de transformação estrutural construída sobre JavaScript, distribuída neste pacote sob o nome DSLJS.
 
-Ela permite definir gramáticas próprias dentro do código e transformá-las, em tempo de compilação, em JavaScript puro e determinístico por meio da criação basica e livre de macros ao estilo rust-like. Não adiciona runtime. Ele opera como sistema de reescrita sintática.
+Ela permite definir gramáticas próprias dentro do código e transformá-las, em tempo de compilação, em JavaScript puro e determinístico por meio da criação livre de macros. Não adiciona runtime. Opera como sistema de reescrita sintática.
 
 O resultado final sempre é JavaScript padrão.
 
@@ -13,161 +14,195 @@ O resultado final sempre é JavaScript padrão.
 
 # Ilustração pelos modelos em example/
 
-Abaixo uso dos exemplos contidos no arquivo na pasta exemplo para explicar aos caso de declaração de macros $ e como eles se desenvolvem. Na seção a seguir, explico conceituamente cada elemento da linguagem.
+Esta seção demonstra:
+
+- O código fonte em `example.dsljs.js`
+- O código gerado em `example.output.js`
+- A explicação instrutiva de cada transformação
 
 ---
 
-# 1. Macro THREE
+# 1. Instanciação Estrutural (THREE)
 
-## Declaração
-
-```dsl
-$macro THREE $a.$b[$delim...] #(
-    const $a = new THREE.$b$delim
-)#
-```
-
-## O que faz
-
-- Captura variável ($a)
-- Captura tipo dentro do namespace THREE ($b)
-- Captura delimitadores ou argumentos variádicos ($delim...)
-- Gera instanciação com `new`
-
-## Uso
+## Fonte (DSL)
 
 ```dsl
 THREE scene.Scene()
-THREE camera.PerspectiveCamera(75, 1.7, 0.1, 1000)
+
+THREE camera.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
+
+if(true){
+    THREE mesh.BoxGeometry[0]
+}
 ```
 
-## Expansão Mental
+## Saída Compilada
 
-```
-THREE scene.Scene()
-        ↓
+```js
 const scene = new THREE.Scene()
-```
 
----
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
 
-# 2. Macro LOG
-
-## Declaração
-
-```dsl
-$macro LOG $msg #(
-    console.log("[Macro Log]:", $msg);
-)#
-```
-
-## O que faz
-
-- Captura mensagem
-- Injeta console.log padronizado
-- Permite log estrutural antes da execução final
-
-## Uso
-
-```dsl
-LOG "Sistema iniciado"
-```
-
----
-
-# 3. Macro ASSIGN
-
-## Declaração
-
-```dsl
-$macro ASSIGN $a = $b #(
-    function $a $b
-)#
-```
-
-## O que faz
-
-- Converte atribuição declarativa em função
-- Permite padronização estrutural de declaração
-
-## Uso
-
-```dsl
-ASSIGN soma = (a, b) {
-    return a + b
+if(true){
+    const mesh = new THREE.BoxGeometry[0]
 }
 ```
 
----
+## Explicação
 
-# 4. Macro style
+Formato DSL:
 
-## Declaração
-
-```dsl
-$macro style ($text) #(
-    console.log($text)
-)#
+```
+THREE variável.Tipo(argumentos)
 ```
 
-## O que faz
+Transformação aplicada:
 
-- Permite injetar bloco literal
-- Aceita template literal
-- Pode ser adaptado para injeção real de CSS
+1. `$a` captura o nome da variável.
+2. `$b` captura o tipo dentro do namespace THREE.
+3. `$delim...` captura os argumentos ou delimitadores.
+4. A macro gera automaticamente:
 
-## Uso
-
-```dsl
-style (/*css*/`
-    body { background: black }
-`)
 ```
+const variável = new THREE.Tipo(argumentos)
+```
+
+Isso remove repetição estrutural e padroniza instanciações.
 
 ---
 
-# 5. Macro struct
+# 2. Log Estrutural (LOG)
 
-## Declaração
+## Fonte (DSL)
 
 ```dsl
-$macro struct $name [
-    $($attr : $val1),
-    $declarações
-] => {
-    $($prop = $value)...
-}
-#(
-    const $name = function(){
-        const $`${$attr}_var` = $val1;
-        return {
-            $attr: () => $`${$attr}_var`,
-            $($prop: $value,)...
-        }
-    }
-)#
+LOG `Build completo com ${$(THREE scene.Scene())}`
 ```
 
-## O que faz
+## Saída Compilada
 
-- Captura atributos estruturais
-- Permite propriedades derivadas
-- Gera função encapsuladora
-- Cria getters automáticos
-- Suporta repetição estrutural
+```js
+console.log("[Macro Log]:", `Build completo com ${const scene = new THREE.Scene()}`);
+```
 
-## Uso
+## Explicação
+
+Formato DSL:
+
+```
+LOG expressão
+```
+
+Transformação:
+
+1. `$msg` captura a expressão completa.
+2. A macro envolve a expressão em um `console.log` padronizado.
+3. Qualquer expressão interna é expandida antes.
+
+Resultado final:
+
+```
+console.log("[Macro Log]:", expressão)
+```
+
+---
+
+# 3. Estrutura Declarativa (struct)
+
+## Fonte (DSL)
 
 ```dsl
+const lista_qualquer = [1,2,3,4]
+
 struct teste [
-    atributo: "teste_atributo"
+    atributo: "teste_atributo",
+    lista_qualquer
 ] => {
     propriedade = "valor teste"
 }
 ```
 
+## Saída Compilada
+
+```js
+const lista_qualquer = [1,2,3,4]
+
+const teste = function(){
+    const $attr_var = "teste_atributo";
+    const teste_1 = lista_qualquer[0];
+    return {
+        atributo: () => $attr_var,
+        propriedade: "valor teste",
+    }
+}
+```
+
+## Explicação
+
+Formato DSL:
+
+```
+struct Nome [
+    atributos
+] => {
+    propriedades derivadas
+}
+```
+
+Processo de transformação:
+
+1. `$name` captura o nome da estrutura.
+2. `$($attr : $val1)` captura pares atributo/valor.
+3. `$declarações` captura elementos adicionais.
+4. O bloco `=> { ... }` define propriedades derivadas.
+5. Dentro de `#( )#`, é gerada uma função encapsuladora.
+6. Cada atributo vira uma variável interna.
+7. São criados getters automáticos.
+8. As propriedades declaradas são adicionadas ao objeto retornado.
+
+Resultado: estrutura declarativa → função encapsulada com estado interno.
+
 ---
 
+# 4. Injeção de Bloco Literal (style)
+
+## Fonte (DSL)
+
+```dsl
+style (/*css*/`
+    #mapa_container {
+        width: 100vw;
+        height: 100vh;
+    }
+`)
+```
+
+## Saída Compilada
+
+```js
+console.log(/*css*/`
+    #mapa_container {
+        width: 100vw;
+        height: 100vh;
+    }
+`)
+```
+
+## Explicação
+
+Formato DSL:
+
+```
+style (texto)
+```
+
+Transformação:
+
+1. `$text` captura o bloco literal completo.
+2. O conteúdo é passado para o JavaScript final.
+3. Pode ser adaptado para injeção real de `<style>`.
+
+---
 
 # Conceito Central
 
@@ -183,101 +218,6 @@ Visualmente:
             #( )
             ↓
 [ JavaScript final ]
-
----
-
-# Anatomia de um Macro
-
-Exemplo autoral:
-
-```dsl
-$macro MODEL $nome (
-        $($campo : $valor)...
-    )
-#(
-    const $nome = {
-        $($campo: $valor,)...
-    }
-)#
-```
-
-## Elementos Fundamentais
-
-### $identificador — Captura
-
-Captura partes da entrada do usuário.
-
-Exemplo:
-MODEL Usuario (...)
-
-$nome = Usuario
-
----
-
-### $( ... ) — Grupo Estrutural
-
-Agrupa padrões compostos.
-
-Exemplo:
-$($campo : $valor)
-
-Trata o conjunto como unidade.
-
----
-
-### ... — Repetição Variádica
-
-Permite capturar múltiplas ocorrências.
-
-Exemplo:
-$( $campo : $valor )...
-
-Captura listas estruturais.
-
----
-
-### Delimitadores
-
-( ), [ ], { } são apenas organização visual.
-
-Não são palavras-chave fixas da DSL.
-
----
-
-# Liberdade Sintática
-
-Tudo antes de #( )# é padrão livre inventado pelo autor.
-
-Nada é obrigatório além de:
-
-$macro
-
-Exemplo válido:
-
-```dsl
-$macro qualquer_coisa <<< $a + $b >>> #(
-    console.log($a + $b)
-)#
-```
-
-"struct", "=>", "{ }", "[ ]" não são tokens obrigatórios.
-São apenas escolhas do autor.
-
----
-
-# #( )# — Domínio JavaScript
-
-Tudo dentro de #( )# precisa ser JavaScript válido.
-
-Exemplo:
-
-```dsl
-#(
-    const x = 10
-)#
-```
-
-Aqui ocorre substituição de capturas.
 
 ---
 
@@ -300,53 +240,10 @@ export default defineConfig({
 });
 ```
 
-Arquivos .dsljs serão processados antes do bundler.
-
----
-
-# Estrutura do Pacote
-
-```
-dsljs/
-├── bin/
-├── example/
-├── src/
-│   ├── parser.js
-│   └── vite-plugin.js
-├── package.json
-└── README.md
-```
-
----
-
-# Configuração Obrigatória no VSCode
-
-Criar pasta:
-
-.projeto/
-└── .vscode/
-    └── settings.json
-
-Conteúdo:
-
-```json
-{
-    "files.associations": {
-        "*.dsl.js": "javascript"
-    },
-    "[javascript]": {
-        "editor.semanticHighlighting.enabled": true
-    },
-    "javascript.validate.enable": false
-}
-```
-
-Necessário para evitar erros de LSP antes da expansão das macros.
-
 ---
 
 # Observações
 
-- DSLJS opera somente em tempo de compilação
+- Opera somente em tempo de compilação
 - Não existe runtime adicional
 - O código final é JavaScript puro

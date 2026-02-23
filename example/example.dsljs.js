@@ -13,22 +13,6 @@ macros: {
         function $a $b
     )#
 
-    $macro newEl $tagName $varName #(
-        let $`$varName` 
-        // = document.createElement(`$tagName`);
-        // $`$varName`.id = `$varName`;
-        // document.body.appendChild($varName);
-    )#
-
-    $macro newMap $varName $bgimg $svgitens #(
-        newEl div $`$varName_container`
-        newEl img $`$varName_fundo`
-        // $`$varName_fundo`.src = $bgimg
-        // newEl img $`$varName_itens`
-        // $`$varName_itens`.src = $svgitens
-        // $`$varName_container`.append($`$varName_fundo`, $`$varName_itens`)
-    )#
-
     $macro style ($text) #(
         console.log($text)
     )#
@@ -73,8 +57,6 @@ struct teste [
     propriedade = "valor teste"
 }
 
-newEl div header 
-newMap mapa "nexus mapa.png" "nexus lotes.svg"
 
 style (/*css*/`
     #mapa_container {
