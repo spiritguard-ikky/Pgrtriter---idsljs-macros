@@ -1,9 +1,11 @@
+#Pgrtriter
+pgr + tr + iter
 
-# DSLJS
+Programação estrutural iterativa.
 
-DSLJS é uma linguagem de transformação estrutural construída sobre JavaScript.
+É uma linguagem de transformação estrutural construída sobre JavaScript e é referenciada nesse pacote pelo nome de pacote DSLJS.
 
-Ela permite definir gramáticas próprias dentro do código e transformá-las, em tempo de compilação, em JavaScript puro e determinístico. DSLJS não adiciona runtime. Ele opera como sistema de reescrita sintática.
+Ela permite definir gramáticas próprias dentro do código e transformá-las, em tempo de compilação, em JavaScript puro e determinístico por meio da criação basica e livre de macros ao estilo rust-like. Não adiciona runtime. Ele opera como sistema de reescrita sintática.
 
 O resultado final sempre é JavaScript padrão.
 
