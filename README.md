@@ -11,6 +11,164 @@ O resultado final sempre é JavaScript padrão.
 
 ---
 
+# Ilustração pelos modelos em example/
+
+Abaixo uso dos exemplos contidos no arquivo na pasta exemplo para explicar aos caso de declaração de macros $ e como eles se desenvolvem. Na seção a seguir, explico conceituamente cada elemento da linguagem.
+
+---
+
+# 1. Macro THREE
+
+## Declaração
+
+```dsl
+$macro THREE $a.$b[$delim...] #(
+    const $a = new THREE.$b$delim
+)#
+```
+
+## O que faz
+
+- Captura variável ($a)
+- Captura tipo dentro do namespace THREE ($b)
+- Captura delimitadores ou argumentos variádicos ($delim...)
+- Gera instanciação com `new`
+
+## Uso
+
+```dsl
+THREE scene.Scene()
+THREE camera.PerspectiveCamera(75, 1.7, 0.1, 1000)
+```
+
+## Expansão Mental
+
+```
+THREE scene.Scene()
+        ↓
+const scene = new THREE.Scene()
+```
+
+---
+
+# 2. Macro LOG
+
+## Declaração
+
+```dsl
+$macro LOG $msg #(
+    console.log("[Macro Log]:", $msg);
+)#
+```
+
+## O que faz
+
+- Captura mensagem
+- Injeta console.log padronizado
+- Permite log estrutural antes da execução final
+
+## Uso
+
+```dsl
+LOG "Sistema iniciado"
+```
+
+---
+
+# 3. Macro ASSIGN
+
+## Declaração
+
+```dsl
+$macro ASSIGN $a = $b #(
+    function $a $b
+)#
+```
+
+## O que faz
+
+- Converte atribuição declarativa em função
+- Permite padronização estrutural de declaração
+
+## Uso
+
+```dsl
+ASSIGN soma = (a, b) {
+    return a + b
+}
+```
+
+---
+
+# 4. Macro style
+
+## Declaração
+
+```dsl
+$macro style ($text) #(
+    console.log($text)
+)#
+```
+
+## O que faz
+
+- Permite injetar bloco literal
+- Aceita template literal
+- Pode ser adaptado para injeção real de CSS
+
+## Uso
+
+```dsl
+style (/*css*/`
+    body { background: black }
+`)
+```
+
+---
+
+# 5. Macro struct
+
+## Declaração
+
+```dsl
+$macro struct $name [
+    $($attr : $val1),
+    $declarações
+] => {
+    $($prop = $value)...
+}
+#(
+    const $name = function(){
+        const $`${$attr}_var` = $val1;
+        return {
+            $attr: () => $`${$attr}_var`,
+            $($prop: $value,)...
+        }
+    }
+)#
+```
+
+## O que faz
+
+- Captura atributos estruturais
+- Permite propriedades derivadas
+- Gera função encapsuladora
+- Cria getters automáticos
+- Suporta repetição estrutural
+
+## Uso
+
+```dsl
+struct teste [
+    atributo: "teste_atributo"
+] => {
+    propriedade = "valor teste"
+}
+```
+
+---
+
+
 # Conceito Central
 
 DSLJS separa dois domínios:
